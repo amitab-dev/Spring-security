@@ -1,0 +1,16 @@
+services:
+  database:
+    image: postgres:17
+    container_name: spring
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: security
+    volumes:
+      - data:/var/lib/postgresql/data
+
+volumes:
+  data:
