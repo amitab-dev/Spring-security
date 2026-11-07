@@ -2,10 +2,14 @@ spring:
   application:
     name: security
   datasource:
-    url: jdbc:postgresql://localost:5432/security
+    url: jdbc:postgresql://localhost:5432/security
     username: postgres
     password: password
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+
+jwt:
+  secret: ${JWT_SECRET:this-is-dev-secret-make-sure-to-change-in-prod}
+  refreshTTL: 604800 # seconds (7 days)

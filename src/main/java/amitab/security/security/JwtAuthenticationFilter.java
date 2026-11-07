@@ -8,14 +8,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.http11.filters.SavedRequestInputFilter;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.UUID;
 
+@Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -29,12 +30,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         final String tokenHeader = request.getHeader("Authorization");
-        if (tokenHeader == null || !tokenHeader.startsWith("Bearer")) {
+        if (tokenHeader == null || !tokenHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = tokenHeader.split("Bearer ")[1];
+        String token = tokenHeader.substring(7);
         UUID userId = UUID.fromString(jwtService.getSubject(token));
 
         if (SecurityContextHolder.getContext().getAuthentication() == null) {

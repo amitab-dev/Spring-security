@@ -18,8 +18,8 @@ public class TokenService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
-    @Value("${jwt.refreshTokenTtl}")
-    private final Long refreshTokenTTL;
+    @Value("${jwt.refreshTTL}")
+    private Long refreshTokenTTL;
 
     public TokenPair issueToken(User user) {
         String accessToken = jwtService.issueToken(user);

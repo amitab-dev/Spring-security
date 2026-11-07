@@ -1,9 +1,6 @@
 package amitab.security.service;
 
-import amitab.security.dto.LoginRequestDto;
-import amitab.security.dto.LoginResponseDto;
-import amitab.security.dto.RegisterRequestDto;
-import amitab.security.dto.RegisterResponseDto;
+import amitab.security.dto.*;
 import amitab.security.models.User;
 import amitab.security.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +17,11 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
+    private final TokenService tokenService;
 
     public RegisterResponseDto register(RegisterRequestDto body) {
         String email = User.normalizeEmail(body.email());
-        if (userRepository.existByEmail(email)) {
+        if (userRepository.existsByEmail(email)) {
             throw new RuntimeException("Email is taken");
         }
         User u = new User();
@@ -41,10 +39,11 @@ public class AuthService {
         );
     }
 
-    public LoginResponseDto login(LoginRequestDto body) {
+    public TokenPair login(LoginRequestDto body) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(body.email(), body.password())
         );
         User user = (User) authentication.getPrincipal();
+        return tokenService.issueToken(user);
     }
 }
