@@ -26,29 +26,98 @@ A Spring Boot REST API for stateless JWT authentication. It uses short-lived acc
 
 ## Getting Started
 
-### Prerequisites
+You can run everything in Docker, or run only the database in Docker and the app on your machine.
 
-- JDK 21
-- Docker (for the local PostgreSQL instance)
+### Option A: Run everything with Docker Compose
 
-### 1. Start the database
-
-```bash
-docker compose up -d
-```
-
-This starts PostgreSQL 17 on `localhost:5432` with database `security`, user `postgres` and password `password`.
-
-### 2. Run the application
+**Prerequisites:** Docker with Compose v2.
 
 ```bash
-export JWT_SECRET="replace-with-a-long-random-secret-at-least-32-bytes"
-./mvnw spring-boot:run
+docker compose up -d --build
 ```
 
-The API is served at `http://localhost:8080`. Hibernate creates and updates the `users` and `tokens` tables automatically (`ddl-auto: update`).
+This starts two containers:
 
-### 3. Run the tests
+| Container      | Service    | Port   | Description                                              |
+|----------------|------------|--------|----------------------------------------------------------|
+| `security-db`  | `database` | `5432` | PostgreSQL 17, data kept in the `data` volume            |
+| `security-app` | `app`      | `8080` | The API, built from the `Dockerfile`                     |
+
+The app starts only after the database passes its `pg_isready` healthcheck. The API is served at `http://localhost:8080`.
+
+Useful commands:
+
+```bash
+docker compose logs -f app      # follow app logs
+docker compose up -d --build app  # rebuild and restart the app after code changes
+docker compose down             # stop containers (data is kept)
+docker compose down -v          # stop containers and delete the database volume
+```
+
+#### Overriding credentials and secrets
+
+Compose reads these variables from your shell or from a `.env` file next to `docker-compose.yml`. The `.env` file is git-ignored. Every variable has a dev default, so the stack runs without one.
+
+```bash
+# .env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=change-me
+POSTGRES_DB=security
+JWT_SECRET=replace-with-a-long-random-secret-at-least-32-bytes
+```
+
+| Variable            | Default                                          | Used by           |
+|---------------------|--------------------------------------------------|-------------------|
+| `POSTGRES_USER`     | `postgres`                                       | database, app     |
+| `POSTGRES_PASSWORD` | `password`                                       | database, app     |
+| `POSTGRES_DB`       | `security`                                       | database, app     |
+| `JWT_SECRET`        | `this-is-dev-secret-make-sure-to-change-in-prod` | app               |
+
+> **Note:** Postgres only applies `POSTGRES_*` when it creates a new data volume. To change them on an existing setup, run `docker compose down -v` first. That deletes all data.
+
+#### About the image
+
+The `Dockerfile` is a multi-stage build:
+
+1. **Build stage** (`eclipse-temurin:21-jdk`): downloads dependencies with the Maven wrapper first, so they stay cached until `pom.xml` changes. Then it builds the jar with tests skipped.
+2. **Runtime stage** (`eclipse-temurin:21-jre`): copies only the jar and runs it as the non-root `spring` user.
+
+The JVM uses up to 75% of the container's memory (`JAVA_OPTS="-XX:MaxRAMPercentage=75.0"`). It runs as PID 1, so `docker stop` triggers a graceful shutdown.
+
+To build and run the image without Compose:
+
+```bash
+docker build -t security-app .
+docker run -p 8080:8080 \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://<db-host>:5432/security \
+  -e SPRING_DATASOURCE_USERNAME=postgres \
+  -e SPRING_DATASOURCE_PASSWORD=password \
+  -e JWT_SECRET=replace-with-a-long-random-secret \
+  security-app
+```
+
+### Option B: Run the app locally
+
+**Prerequisites:** JDK 21 and Docker (for PostgreSQL).
+
+1. Start only the database:
+
+   ```bash
+   docker compose up -d database
+   ```
+
+2. Run the application:
+
+   ```bash
+   export JWT_SECRET="replace-with-a-long-random-secret-at-least-32-bytes"
+   ./mvnw spring-boot:run
+   ```
+
+The API is served at `http://localhost:8080`. If the `security-app` container is running, stop it first (`docker compose stop app`) because it uses the same port.
+
+Either way, Hibernate creates and updates the `users` and `tokens` tables automatically (`ddl-auto: update`).
+
+### Run the tests
 
 ```bash
 ./mvnw test
@@ -56,15 +125,18 @@ The API is served at `http://localhost:8080`. Hibernate creates and updates the 
 
 ## Configuration
 
-Settings live in `src/main/resources/application.yaml`.
+Settings live in `src/main/resources/application.yaml`. Each value can be overridden with the environment variable shown.
 
-| Property                     | Default                                         | Description                                   |
-|------------------------------|-------------------------------------------------|-----------------------------------------------|
-| `spring.datasource.url`      | `jdbc:postgresql://localhost:5432/security`     | JDBC URL                                      |
-| `spring.datasource.username` | `postgres`                                      | DB user                                       |
-| `spring.datasource.password` | `password`                                      | DB password                                   |
-| `jwt.secret`                 | `${JWT_SECRET}`, falling back to a dev secret   | HMAC signing key (must be ≥ 256 bits)         |
-| `jwt.refreshTTL`             | `2592000`                                       | Refresh token lifetime in seconds (30 days)   |
+| Property                     | Environment variable          | Default                                       | Description                                 |
+|------------------------------|-------------------------------|-----------------------------------------------|---------------------------------------------|
+| `spring.datasource.url`      | `SPRING_DATASOURCE_URL`       | `jdbc:postgresql://localhost:5432/security`   | JDBC URL                                    |
+| `spring.datasource.username` | `SPRING_DATASOURCE_USERNAME`  | `postgres`                                    | DB user                                     |
+| `spring.datasource.password` | `SPRING_DATASOURCE_PASSWORD`  | `password`                                    | DB password                                 |
+| `spring.jpa.show-sql`        | `SHOW_SQL`                    | `false`                                       | Log SQL statements                          |
+| `jwt.secret`                 | `JWT_SECRET`                  | A public dev secret                           | HMAC signing key (must be ≥ 256 bits)       |
+| `jwt.refreshTTL`             | `JWT_REFRESH_TTL`             | `2592000`                                     | Refresh token lifetime in seconds (30 days) |
+
+Graceful shutdown is enabled (`server.shutdown: graceful`). In-flight requests get up to 20 seconds to finish.
 
 > **Warning:** Always set `JWT_SECRET` outside of local development. The fallback secret is public.
 
@@ -154,6 +226,7 @@ Authorization: Bearer <accessToken>
 | Exception             | HTTP status |
 |-----------------------|-------------|
 | `BadRequestException` | 400         |
+| `TokenReuseException` | 401         |
 | `NotFoundException`   | 404         |
 | `ConflictException`   | 409         |
 | Anything else         | 500         |
