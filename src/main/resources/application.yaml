@@ -2,14 +2,20 @@ spring:
   application:
     name: security
   datasource:
-    url: jdbc:postgresql://localhost:5432/security
-    username: postgres
-    password: password
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/security}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: ${SHOW_SQL:false}
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  shutdown: graceful
 
 jwt:
   secret: ${JWT_SECRET:this-is-dev-secret-make-sure-to-change-in-prod}
-  refreshTTL: 2592000
+  refreshTTL: ${JWT_REFRESH_TTL:2592000}
