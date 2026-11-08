@@ -1,6 +1,7 @@
 package amitab.security.service;
 
 import amitab.security.dto.TokenPair;
+import amitab.security.exception.TokenReuseException;
 import amitab.security.models.Token;
 import amitab.security.models.User;
 import amitab.security.repository.TokenRepository;
@@ -47,7 +48,7 @@ public class TokenService {
                 .ifPresent(token -> token.setRevokedAt(Instant.now()));
     }
 
-    @Transactional
+    @Transactional(dontRollbackOn = TokenReuseException.class)
     public TokenPair rotateRefreshToken(String refreshToken) {
         String hashedToken = refreshTokenService.hashToken(refreshToken);
         Instant now = Instant.now();
@@ -57,8 +58,8 @@ public class TokenService {
 
         // Make sure to revoke all users as token reuse detected
         if (token.getRevokedAt() != null) {
-            tokenRepository.revokeForAllUsers(hashedToken);
-            throw new RuntimeException("Refresh token reuse detected");
+            tokenRepository.revokeAllForUser(user.getId(), now);
+            throw new TokenReuseException("Refresh token reuse detected");
         }
 
         if (token.getExpiredAt().isBefore(now)) {

@@ -8,8 +8,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.UUID;
 
 public interface TokenRepository extends JpaRepository<Token, UUID> {
@@ -21,5 +21,5 @@ public interface TokenRepository extends JpaRepository<Token, UUID> {
                     SET t.revokedAt = :now, t.updatedAt = :now
                     WHERE t.user.id = :userId AND t.revokedAt IS NULL
             """)
-    void revokeForAllUsers(String hashedToken);
+    int revokeAllForUser(@Param("userId") UUID userId, @Param("now") Instant now);
 }
