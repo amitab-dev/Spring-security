@@ -7,7 +7,6 @@ import java.time.Instant;
 public record ErrorResponseDto(
         HttpStatus status,
         String message,
-        Instant timestamp,
-        String path
+        Instant timestamp
 ) {
 }

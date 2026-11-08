@@ -1,6 +1,7 @@
 package amitab.security.service;
 
 import amitab.security.dto.*;
+import amitab.security.exception.ConflictException;
 import amitab.security.models.User;
 import amitab.security.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class AuthService {
     public RegisterResponseDto register(RegisterRequestDto body) {
         String email = User.normalizeEmail(body.email());
         if (userRepository.existsByEmail(email)) {
-            throw new RuntimeException("Email is taken");
+            throw new ConflictException("Email is taken");
         }
         User u = new User();
         u.setName(body.name());
@@ -45,5 +46,13 @@ public class AuthService {
         );
         User user = (User) authentication.getPrincipal();
         return tokenService.issueToken(user);
+    }
+
+    public void logout(String refreshToken) {
+        tokenService.revokeRefreshToken(refreshToken);
+    }
+
+    public TokenPair refreshAccessToken(String refreshToken) {
+        return tokenService.rotateRefreshToken(refreshToken);
     }
 }
